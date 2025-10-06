@@ -1,5 +1,6 @@
 <?php
 require_once 'config/database.php';
+require_once 'config/auth.php';
 
 // Get the request method and URI
 $method = $_SERVER['REQUEST_METHOD'];
@@ -46,7 +47,35 @@ try {
         exit;
     }
     
+    if ($path === 'login') {
+        include 'public/login.html';
+        exit;
+    }
+    
+    if ($path === 'install') {
+        include 'install.php';
+        exit;
+    }
+    
+    if ($path === 'setup') {
+        // Check if any admin users exist
+        if (hasAdminUsers()) {
+            // If admin users exist, redirect to login
+            header('Location: /login');
+            exit;
+        }
+        include 'public/setup.html';
+        exit;
+    }
+    
     if ($path === 'admin') {
+        // Check if any admin users exist
+        if (!hasAdminUsers()) {
+            // If no admin users exist, redirect to setup
+            header('Location: /setup');
+            exit;
+        }
+        requireAuth(); // Require authentication for admin panel
         include 'public/admin.html';
         exit;
     }
@@ -55,9 +84,102 @@ try {
     if (strpos($path, 'api/') === 0) {
         $apiPath = substr($path, 4); // Remove 'api/' prefix
         
+        // Authentication routes
+        if ($apiPath === 'auth/login' && $method === 'POST') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $username = sanitizeInput($input['username'] ?? '');
+            $password = $input['password'] ?? '';
+            
+            // Check rate limiting
+            $clientIP = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+            if (!checkRateLimit($clientIP)) {
+                $remainingTime = getRateLimitRemainingTime($clientIP);
+                sendJsonResponse(['error' => "Te veel inlogpogingen. Probeer het over {$remainingTime} seconden opnieuw."], 429);
+            }
+            
+            if (authenticate($username, $password)) {
+                sendJsonResponse(['success' => true, 'message' => 'Succesvol ingelogd']);
+            } else {
+                recordFailedAttempt($clientIP);
+                sendJsonResponse(['error' => 'Ongeldige gebruikersnaam of wachtwoord'], 401);
+            }
+        }
+        
+        if ($apiPath === 'auth/logout' && $method === 'POST') {
+            logout();
+            sendJsonResponse(['success' => true, 'message' => 'Succesvol uitgelogd']);
+        }
+        
+        if ($apiPath === 'auth/check' && $method === 'GET') {
+            if (isAuthenticated()) {
+                sendJsonResponse(['authenticated' => true, 'username' => $_SESSION['username']]);
+            } else {
+                sendJsonResponse(['authenticated' => false], 401);
+            }
+        }
+        
+        // Setup route for creating first admin user
+        if ($apiPath === 'setup/create-admin' && $method === 'POST') {
+            // Only allow if no admin users exist
+            if (hasAdminUsers()) {
+                sendJsonResponse(['error' => 'Admin users already exist'], 403);
+            }
+            
+            $input = json_decode(file_get_contents('php://input'), true);
+            $username = sanitizeInput($input['username'] ?? '');
+            $password = $input['password'] ?? '';
+            $email = sanitizeInput($input['email'] ?? '');
+            $fullName = sanitizeInput($input['fullName'] ?? '');
+            
+            // Validate input
+            if (empty($username) || empty($password)) {
+                sendJsonResponse(['error' => 'Gebruikersnaam en wachtwoord zijn verplicht'], 400);
+            }
+            
+            if (strlen($password) < 6) {
+                sendJsonResponse(['error' => 'Wachtwoord moet minimaal 6 karakters lang zijn'], 400);
+            }
+            
+            // Create the first admin user
+            $userId = createAdminUser($username, $password, $email, $fullName);
+            
+            if ($userId) {
+                // Automatically log in the new user
+                authenticate($username, $password);
+                sendJsonResponse(['success' => true, 'message' => 'Admin gebruiker succesvol aangemaakt']);
+            } else {
+                sendJsonResponse(['error' => 'Fout bij het aanmaken van admin gebruiker'], 500);
+            }
+        }
+        
+        // Helper function to check admin authentication for API routes
+        function requireAdminAuth() {
+            if (!isAuthenticated()) {
+                sendJsonResponse(['error' => 'Admin authentication required'], 401);
+            }
+        }
+        
         // GET /api/tests - Get all tests
         if ($apiPath === 'tests' && $method === 'GET') {
             $stmt = executeQuery($pdo, 'SELECT * FROM tests ORDER BY created_at DESC');
+            $tests = $stmt->fetchAll();
+            sendJsonResponse($tests);
+        }
+        
+        // GET /api/tests/stats - Get test statistics
+        if ($apiPath === 'tests/stats' && $method === 'GET') {
+            $stmt = executeQuery($pdo, '
+                SELECT 
+                    t.id,
+                    t.title,
+                    t.description,
+                    t.created_at,
+                    COUNT(q.id) as question_count
+                FROM tests t
+                LEFT JOIN questions q ON t.id = q.test_id
+                GROUP BY t.id, t.title, t.description, t.created_at
+                ORDER BY t.created_at DESC
+            ');
             $tests = $stmt->fetchAll();
             sendJsonResponse($tests);
         }
@@ -88,6 +210,7 @@ try {
         
         // POST /api/tests - Create new test
         if ($apiPath === 'tests' && $method === 'POST') {
+            requireAdminAuth();
             $input = json_decode(file_get_contents('php://input'), true);
             $title = $input['title'] ?? '';
             $description = $input['description'] ?? '';
@@ -103,12 +226,13 @@ try {
         
         // POST /api/questions - Create new question
         if ($apiPath === 'questions' && $method === 'POST') {
+            requireAdminAuth();
             $input = json_decode(file_get_contents('php://input'), true);
             $testId = $input['test_id'] ?? '';
             $question = $input['question'] ?? '';
             $correctAnswer = $input['correct_answer'] ?? '';
             $explanation = $input['explanation'] ?? '';
-            $questionOrder = $input['question_order'] ?? 1;
+            $questionOrder = max(1, intval($input['question_order'] ?? 1));
             
             $stmt = executeQuery($pdo, 
                 'INSERT INTO questions (test_id, question, correct_answer, explanation, question_order) VALUES (?, ?, ?, ?, ?)', 
@@ -121,6 +245,7 @@ try {
         
         // PUT /api/tests/:id - Update test
         if (preg_match('/^tests\/(\d+)$/', $apiPath, $matches) && $method === 'PUT') {
+            requireAdminAuth();
             $testId = $matches[1];
             $input = json_decode(file_get_contents('php://input'), true);
             $title = $input['title'] ?? '';
@@ -136,6 +261,7 @@ try {
         
         // DELETE /api/tests/:id - Delete test
         if (preg_match('/^tests\/(\d+)$/', $apiPath, $matches) && $method === 'DELETE') {
+            requireAdminAuth();
             $testId = $matches[1];
             executeQuery($pdo, 'DELETE FROM tests WHERE id = ?', [$testId]);
             sendJsonResponse(['message' => 'Test deleted successfully']);
@@ -143,12 +269,13 @@ try {
         
         // PUT /api/questions/:id - Update question
         if (preg_match('/^questions\/(\d+)$/', $apiPath, $matches) && $method === 'PUT') {
+            requireAdminAuth();
             $questionId = $matches[1];
             $input = json_decode(file_get_contents('php://input'), true);
             $question = $input['question'] ?? '';
             $correctAnswer = $input['correct_answer'] ?? '';
             $explanation = $input['explanation'] ?? '';
-            $questionOrder = $input['question_order'] ?? 1;
+            $questionOrder = max(1, intval($input['question_order'] ?? 1));
             
             $stmt = executeQuery($pdo, 
                 'UPDATE questions SET question = ?, correct_answer = ?, explanation = ?, question_order = ? WHERE id = ?', 
@@ -160,6 +287,7 @@ try {
         
         // DELETE /api/questions/:id - Delete question
         if (preg_match('/^questions\/(\d+)$/', $apiPath, $matches) && $method === 'DELETE') {
+            requireAdminAuth();
             $questionId = $matches[1];
             executeQuery($pdo, 'DELETE FROM questions WHERE id = ?', [$questionId]);
             sendJsonResponse(['message' => 'Question deleted successfully']);
@@ -174,7 +302,15 @@ try {
     echo "Page not found";
     
 } catch (Exception $e) {
-    error_log("Error: " . $e->getMessage());
-    sendJsonResponse(['error' => $e->getMessage()], 500);
+    error_log("Error in " . __FILE__ . " at line " . __LINE__ . ": " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
+    
+    // Don't expose internal errors in production
+    $errorMessage = 'Er is een onverwachte fout opgetreden. Probeer het later opnieuw.';
+    if (defined('DEBUG') && DEBUG) {
+        $errorMessage = $e->getMessage();
+    }
+    
+    sendJsonResponse(['error' => $errorMessage], 500);
 }
 ?>

@@ -1,74 +1,62 @@
-# Learning Practice Website
+# Overhoren - Nederlandse Oefenwebsite
 
-A simple and fun learning practice website for kids built with Node.js and MySQL.
+Een eenvoudige en leuke Nederlandse oefenwebsite voor het maken van toetsen, gebouwd met PHP en MySQL.
 
-## Features
+## Functies
 
-- **Test Overview**: Browse available tests on the main page
-- **Interactive Testing**: Take tests with immediate feedback
-- **Answer Validation**: Get instant feedback on correct/incorrect answers
-- **Skip Questions**: Option to skip questions you don't know
-- **Results Review**: See your score and review all answers
-- **Admin Panel**: Add new tests and questions (authorized users)
-- **Kid-Friendly Design**: Bright colors, large buttons, simple navigation
+- **Toets Overzicht**: Bekijk beschikbare toetsen op de hoofdpagina
+- **Interactief Testen**: Maak toetsen met directe feedback
+- **Antwoord Validatie**: Krijg directe feedback op juiste/onjuiste antwoorden
+- **Vragen Overslaan**: Optie om vragen over te slaan die je niet weet
+- **Resultaten Bekijken**: Zie je score en bekijk alle antwoorden
+- **Beheerpaneel**: Voeg nieuwe toetsen en vragen toe
+- **Gebruiksvriendelijk Ontwerp**: Moderne interface met duidelijke navigatie
 
 ## Tech Stack
 
-- **Backend**: Node.js with Express.js
+- **Backend**: PHP met PDO
 - **Database**: MySQL (via XAMPP)
 - **Frontend**: HTML, CSS, JavaScript
-- **Styling**: Custom CSS with responsive design
+- **Styling**: Custom CSS met responsive design
 
-## Setup Instructions
+## Installatie Instructies
 
-### Prerequisites
-- XAMPP installed and running
-- Node.js installed
-- MySQL running on localhost
+### Vereisten
+- XAMPP geïnstalleerd en actief
+- MySQL draait op localhost
 
-### Installation
+### Installatie
 
-1. **Install dependencies:**
-```bash
-npm install
-```
-
-2. **Set up the database:**
+1. **Database opzetten:**
    - Open phpMyAdmin (http://localhost/phpmyadmin)
-   - Import the database schema:
+   - Importeer het database schema:
    ```sql
-   -- Run the contents of database/schema.sql in phpMyAdmin
+   -- Voer de inhoud van database/schema.sql uit in phpMyAdmin
    ```
 
-3. **Configure environment:**
-   - The app uses default XAMPP MySQL settings:
+2. **Omgeving configureren:**
+   - De app gebruikt standaard XAMPP MySQL instellingen:
      - Host: localhost
-     - User: root
-     - Password: (empty)
+     - Gebruiker: root
+     - Wachtwoord: (leeg)
      - Database: overhoren
 
-4. **Start the server:**
-```bash
-npm start
-```
+3. **Website benaderen:**
+   - Hoofdsite: http://localhost/overhoren
+   - Beheerpaneel: http://localhost/overhoren/admin
 
-5. **Access the website:**
-   - Main site: http://overhoren.test
-   - Admin panel: http://overhoren.test/admin
-
-## Project Structure
+## Project Structuur
 
 ```
 overhoren/
-├── server.js                 # Main server file
-├── package.json              # Dependencies
+├── index.php                 # Hoofdbestand (router)
 ├── config/
-│   └── database.js          # MySQL connection
-├── public/                   # Frontend files
-│   ├── index.html           # Main page
-│   ├── test.html            # Test taking page
-│   ├── results.html         # Results page
-│   ├── admin.html           # Admin panel
+│   └── database.php         # MySQL verbinding
+├── public/                   # Frontend bestanden
+│   ├── index.html           # Hoofdpagina
+│   ├── test.html            # Toets maken pagina
+│   ├── results.html         # Resultaten pagina
+│   ├── admin.html           # Beheerpaneel
 │   └── css/
 │       └── style.css        # Styling
 ├── database/
@@ -78,67 +66,62 @@ overhoren/
 
 ## Database Schema
 
-### Tests Table
-- `id` - Primary key
-- `title` - Test title
-- `description` - Test description
-- `created_at` - Creation timestamp
+### Tests Tabel
+- `id` - Primaire sleutel
+- `title` - Toets titel
+- `description` - Toets beschrijving
+- `created_at` - Aanmaak timestamp
 
-### Questions Table
-- `id` - Primary key
-- `test_id` - Foreign key to tests
-- `question` - Question text
-- `correct_answer` - Correct answer
-- `explanation` - Optional explanation
-- `question_order` - Order of questions
-- `created_at` - Creation timestamp
+### Questions Tabel
+- `id` - Primaire sleutel
+- `test_id` - Foreign key naar tests
+- `question` - Vraag tekst
+- `correct_answer` - Correct antwoord
+- `explanation` - Optionele uitleg
+- `question_order` - Volgorde van vragen
+- `created_at` - Aanmaak timestamp
 
-## Usage
+## Gebruik
 
-### For Students
-1. Visit the main page to see available tests
-2. Click "Start Test" on any test
-3. Answer questions one by one
-4. Get immediate feedback on your answers
-5. Skip questions you don't know
-6. View your final score and review all answers
+### Voor Studenten
+1. Bezoek de hoofdpagina om beschikbare toetsen te zien
+2. Klik op "Start Toets" bij een toets
+3. Beantwoord vragen een voor een
+4. Krijg directe feedback op je antwoorden
+5. Sla vragen over die je niet weet
+6. Bekijk je eindscore en alle antwoorden
 
-### For Admins
-1. Go to the Admin Panel
-2. Create new tests with titles and descriptions
-3. Add questions with correct answers and explanations
-4. Manage existing tests (view/delete)
+### Voor Beheerders
+1. Ga naar het Beheerpaneel
+2. Maak nieuwe toetsen met titels en beschrijvingen
+3. Voeg vragen toe met juiste antwoorden en uitleg
+4. Beheer bestaande toetsen (bekijk/verwijder)
 
-## Sample Data
+## Voorbeeld Data
 
-The database comes with sample tests:
-- **Math Basics**: Simple addition and subtraction
-- **Spelling Test**: Common words for kids
-- **Colors Quiz**: Learning about colors
-- **Animal Facts**: Fun facts about animals
+De database bevat Nederlandse toetsen:
+- **Nederlandse Taal**: Basis Nederlandse taalvaardigheid en grammatica
+- **Geschiedenis van Nederland**: Belangrijke gebeurtenissen en personen
+- **Aardrijkskunde**: Nederlandse provincies, steden en geografische kennis
+- **Rekenen**: Basis rekenvaardigheden en wiskundige concepten
+- **Nederlandse Cultuur**: Tradities, feestdagen en culturele aspecten
 
-## Development
+## Ontwikkeling
 
-### Running in Development Mode
-```bash
-npm run dev
-```
-This uses nodemon for automatic server restarts.
-
-### Adding New Features
-- API routes are in `server.js`
-- Frontend logic is in the HTML files
+### Nieuwe Functies Toevoegen
+- API routes zijn in `index.php`
+- Frontend logica is in de HTML bestanden
 - Styling is in `public/css/style.css`
 
 ## Deployment
 
-For production deployment:
-1. Set up a production MySQL database
-2. Update the database configuration in `config/database.js`
-3. Set environment variables for production
-4. Use a process manager like PM2
+Voor productie deployment:
+1. Zet een productie MySQL database op
+2. Update de database configuratie in `config/database.php`
+3. Stel omgevingsvariabelen in voor productie
+4. Gebruik een webserver zoals Apache of Nginx
 
-## License
+## Licentie
 
-MIT License - feel free to use and modify for educational purposes.
+MIT Licentie - vrij te gebruiken en aan te passen voor educatieve doeleinden.
 

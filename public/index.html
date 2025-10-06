@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overhoren - Oefen en Verbeter</title>
+    <link rel="stylesheet" href="public/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 Overhoren</h1>
+            <p>Selecteer een toets om te oefenen en je kennis te verbeteren</p>
+        </header>
+        
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <div class="hero-content">
+                <div class="hero-icon">📊</div>
+                <h2>Klaar om je kennis te testen?</h2>
+                <p>Kies uit onze collectie oefentoetsen hieronder. Elke toets geeft directe feedback en gedetailleerde uitleg om je te helpen leren en verbeteren.</p>
+                <div class="hero-actions">
+                    <button class="btn btn-primary btn-lg" onclick="scrollToTests()">
+                        📋 Bekijk Toetsen
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation Bar -->
+        <nav class="main-nav">
+            <div class="nav-content">
+                <div class="nav-brand">
+                    <span class="nav-icon">📝</span>
+                    <span class="nav-title">Overhoren</span>
+                </div>
+                <div class="nav-actions">
+                    <button class="btn btn-outline btn-primary" onclick="refreshTests()">
+                        🔄 Ververs Toetsen
+                    </button>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <button class="btn btn-info" onclick="toggleStats()">
+                📊 Statistieken
+            </button>
+        </div>
+        
+        <!-- Statistics Section -->
+        <div id="stats-section" class="stats-section" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="main-total-tests">-</div>
+                    <div class="stat-label">📝 Beschikbare Toetsen</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="main-total-questions">-</div>
+                    <div class="stat-label">❓ Totaal Vragen</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="main-recent-tests">-</div>
+                    <div class="stat-label">🆕 Recente Toetsen</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>📝 Toetsen laden...</p>
+        </div>
+        
+        <div id="tests-container" class="tests-grid" style="display: none;">
+            <!-- Tests will be loaded here -->
+        </div>
+        
+        <div id="error-message" class="error-message" style="display: none;">
+            <div class="error-content">
+                <div class="error-icon">⚠️</div>
+                <h3>Fout bij laden van toetsen</h3>
+                <p>Kan toetsen op dit moment niet laden. Probeer het opnieuw.</p>
+                <button onclick="loadTests()" class="btn btn-primary">
+                    🔄 Probeer Opnieuw
+                </button>
+            </div>
+        </div>
+        
+        <div id="no-tests" class="no-tests" style="display: none;">
+            <div class="no-tests-content">
+                <div class="no-tests-icon">📝</div>
+                <h3>Geen toetsen beschikbaar</h3>
+                <p>Er zijn momenteel geen oefentoetsen beschikbaar.</p>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        // Load tests from API
+        async function loadTests() {
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('tests-container');
+            const errorMessage = document.getElementById('error-message');
+            const noTests = document.getElementById('no-tests');
+            
+            loading.style.display = 'block';
+            container.style.display = 'none';
+            errorMessage.style.display = 'none';
+            noTests.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/tests');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch tests');
+                }
+                
+                const tests = await response.json();
+                
+                if (tests.length === 0) {
+                    loading.style.display = 'none';
+                    noTests.style.display = 'block';
+                } else {
+                    container.innerHTML = '';
+                    tests.forEach((test, index) => {
+                        const testCard = document.createElement('div');
+                        testCard.className = 'test-card-enhanced';
+                        testCard.innerHTML = `
+                            <div class="test-header">
+                                <h3 class="test-title">${escapeHtml(test.title)}</h3>
+                                <div class="test-meta">
+                                    <div class="test-meta-item">
+                                        <span>❓</span>
+                                        <span id="question-count-${test.id}">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="test-description">
+                                ${escapeHtml(test.description || 'No description available')}
+                            </div>
+                            <div class="test-actions">
+                                <a href="test?id=${test.id}" class="btn btn-primary btn-lg">
+                                    📝 Start Toets
+                                </a>
+                            </div>
+                        `;
+                        container.appendChild(testCard);
+                        
+                        // Load question count for this test
+                        loadQuestionCountForMain(test.id);
+                    });
+                    
+                    loading.style.display = 'none';
+                    container.style.display = 'grid';
+                }
+                
+            } catch (error) {
+                console.error('Error loading tests:', error);
+                loading.style.display = 'none';
+                errorMessage.style.display = 'block';
+            }
+        }
+
+        // Refresh tests function
+        function refreshTests() {
+            loadTests();
+        }
+
+        // Toggle statistics section
+        function toggleStats() {
+            const statsSection = document.getElementById('stats-section');
+            const isVisible = statsSection.style.display !== 'none';
+            
+            if (isVisible) {
+                statsSection.style.display = 'none';
+            } else {
+                statsSection.style.display = 'block';
+                updateMainStats();
+            }
+        }
+
+        // Update main page statistics
+        async function updateMainStats() {
+            try {
+                const response = await fetch('/api/tests');
+                const tests = await response.json();
+                
+                document.getElementById('main-total-tests').textContent = tests.length;
+                
+                let totalQuestions = 0;
+                let recentTests = 0;
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
+                for (const test of tests) {
+                    try {
+                        const questionsResponse = await fetch(`/api/tests/${test.id}/questions`);
+                        const questions = await questionsResponse.json();
+                        totalQuestions += questions.length;
+                        
+                        if (new Date(test.created_at) > oneWeekAgo) {
+                            recentTests++;
+                        }
+                    } catch (error) {
+                        console.error('Error loading questions for test:', test.id);
+                    }
+                }
+                
+                document.getElementById('main-total-questions').textContent = totalQuestions;
+                document.getElementById('main-recent-tests').textContent = recentTests;
+                
+            } catch (error) {
+                console.error('Error updating statistics:', error);
+            }
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Scroll to tests section
+        function scrollToTests() {
+            const testsContainer = document.getElementById('tests-container');
+            if (testsContainer) {
+                testsContainer.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        }
+
+        // Load question count for main page
+        async function loadQuestionCountForMain(testId) {
+            try {
+                const response = await fetch(`/api/tests/${testId}/questions`);
+                const questions = await response.json();
+                const countElement = document.getElementById(`question-count-${testId}`);
+                if (countElement) {
+                    countElement.textContent = `${questions.length} vragen`;
+                }
+            } catch (error) {
+                console.error('Error loading question count:', error);
+                const countElement = document.getElementById(`question-count-${testId}`);
+                if (countElement) {
+                    countElement.textContent = 'vragen';
+                }
+            }
+        }
+
+
+        // Show message function
+        function showMessage(text, type) {
+            // Create a temporary message element
+            const message = document.createElement('div');
+            message.className = `message ${type}`;
+            message.textContent = text;
+            message.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            if (type === 'error') {
+                message.style.background = '#dc3545';
+            } else {
+                message.style.background = '#28a745';
+            }
+            
+            document.body.appendChild(message);
+            
+            setTimeout(() => {
+                message.remove();
+            }, 3000);
+        }
+
+        // Load tests when page loads
+        document.addEventListener('DOMContentLoaded', loadTests);
+    </script>
+</body>
+</html>
+

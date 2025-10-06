@@ -1,0 +1,29 @@
+RewriteEngine On
+
+# Handle API routes
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ index.php [QSA,L]
+
+# Handle page routes
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(test|admin|results)/?$ index.php [QSA,L]
+
+# Handle root route
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^$ index.php [QSA,L]
+
+# Security: Prevent access to sensitive files
+<Files "config/database.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# Enable CORS for API requests
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type"
+</IfModule>

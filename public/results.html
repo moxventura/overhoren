@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toets Resultaten - Overhoren</title>
+    <link rel="stylesheet" href="public/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎉 Toets Resultaten</h1>
+        </header>
+        
+        <div id="no-results" class="no-results" style="display: none;">
+            <div class="no-tests-content">
+                <div class="no-tests-icon">📊</div>
+                <h3>Geen toets resultaten gevonden</h3>
+                <p>Het lijkt erop dat je nog geen toets hebt voltooid.</p>
+                <a href="/" class="btn btn-primary">
+                    🚀 Maak een Toets
+                </a>
+            </div>
+        </div>
+        
+        <div id="results-container" class="results-container" style="display: none;">
+            <!-- Hero Section for Results -->
+            <div class="results-hero">
+                <div class="results-hero-content">
+                    <div class="results-icon">📊</div>
+                    <h2 id="test-name">Toets Naam</h2>
+                    <p>Toets voltooid. Bekijk je resultaten hieronder:</p>
+                </div>
+            </div>
+            
+            <!-- Score Summary Card -->
+            <div class="score-summary-card">
+                <div class="score-main">
+                    <div class="score-circle">
+                        <span id="score-percentage">0%</span>
+                    </div>
+                    <div class="score-info">
+                        <h3>Jouw Score</h3>
+                        <p><strong id="correct-count">0</strong> van de <strong id="total-count">0</strong> vragen correct</p>
+                        <p class="time-info">⏱️ Tijd besteed: <strong id="time-spent">0</strong> seconden</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Question Review Section -->
+            <div class="question-review-section">
+                <div class="section-header">
+                    <h3>📝 Vraag Beoordeling</h3>
+                    <p>Bekijk je antwoorden en leer van eventuele fouten</p>
+                </div>
+                <div id="questions-list" class="questions-grid">
+                    <!-- Questions will be loaded here -->
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="results-actions">
+                <a href="/" class="btn btn-primary btn-lg">
+                    📝 Maak een Andere Toets
+                </a>
+                <button id="retake-test" class="btn btn-outline btn-primary btn-lg">
+                    🔄 Herhaal Deze Toets
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let testResults = null;
+
+        // Load results from sessionStorage
+        function loadResults() {
+            const resultsData = sessionStorage.getItem('testResults');
+            
+            if (!resultsData) {
+                document.getElementById('no-results').style.display = 'block';
+                return;
+            }
+            
+            testResults = JSON.parse(resultsData);
+            displayResults();
+        }
+
+        // Display results
+        function displayResults() {
+            const container = document.getElementById('results-container');
+            const noResults = document.getElementById('no-results');
+            
+            // Show results container
+            container.style.display = 'block';
+            noResults.style.display = 'none';
+            
+            // Update test name
+            document.getElementById('test-name').textContent = testResults.test.title;
+            
+            // Update score
+            document.getElementById('score-percentage').textContent = testResults.score + '%';
+            document.getElementById('correct-count').textContent = testResults.correctAnswers;
+            document.getElementById('total-count').textContent = testResults.totalQuestions;
+            document.getElementById('time-spent').textContent = testResults.timeSpent;
+            
+            // Update score circle color
+            const scoreCircle = document.querySelector('.score-circle');
+            if (testResults.score >= 80) {
+                scoreCircle.classList.add('score-excellent');
+            } else if (testResults.score >= 60) {
+                scoreCircle.classList.add('score-good');
+            } else {
+                scoreCircle.classList.add('score-needs-improvement');
+            }
+            
+            // Display questions
+            displayQuestions();
+        }
+
+        // Display individual questions
+        function displayQuestions() {
+            const questionsList = document.getElementById('questions-list');
+            questionsList.innerHTML = '';
+            
+            testResults.answers.forEach((answer, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = `question-result ${answer.isCorrect ? 'correct' : 'incorrect'}`;
+                
+                let statusIcon = '✅';
+                let statusText = 'Correct';
+                if (answer.skipped) {
+                    statusIcon = '⏭️';
+                    statusText = 'Overgeslagen';
+                } else if (!answer.isCorrect) {
+                    statusIcon = '❌';
+                    statusText = 'Incorrect';
+                }
+                
+                questionDiv.innerHTML = `
+                    <div class="question-header">
+                        <span class="question-number">📝 Vraag ${index + 1}</span>
+                        <span class="question-status ${answer.isCorrect ? 'correct' : 'incorrect'}">
+                            ${statusIcon} ${statusText}
+                        </span>
+                    </div>
+                    <div class="question-content">
+                        <p class="question-text"><strong>❓ Vraag:</strong> ${escapeHtml(answer.question)}</p>
+                        ${answer.userAnswer ? `<p class="user-answer"><strong>✍️ Jouw antwoord:</strong> ${escapeHtml(answer.userAnswer)}</p>` : ''}
+                        <p class="correct-answer"><strong>✅ Correct antwoord:</strong> ${escapeHtml(answer.correctAnswer)}</p>
+                        ${answer.explanation ? `<div class="explanation"><strong>💡 Uitleg:</strong> ${escapeHtml(answer.explanation)}</div>` : ''}
+                    </div>
+                `;
+                
+                questionsList.appendChild(questionDiv);
+            });
+        }
+
+        // Retake test
+        function retakeTest() {
+            if (testResults && testResults.test) {
+                window.location.href = `test?id=${testResults.test.id}`;
+            }
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listeners
+        document.getElementById('retake-test').addEventListener('click', retakeTest);
+
+        // Load results when page loads
+        document.addEventListener('DOMContentLoaded', loadResults);
+    </script>
+</body>
+</html>
+

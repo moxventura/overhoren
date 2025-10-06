@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toets - Overhoren</title>
+    <link rel="stylesheet" href="public/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 id="test-title">Toets Laden...</h1>
+        </header>
+        
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <p id="progress-text" class="progress-text">Vraag 0 van 0</p>
+        </div>
+        
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Toets laden...</p>
+        </div>
+        
+        <div id="test-container" class="test-container" style="display: none;">
+            <div class="question-card">
+                <h2 id="question-text">Vraag verschijnt hier</h2>
+                <div class="answer-section">
+                    <input type="text" id="answer-input" placeholder="Typ je antwoord hier..." autocomplete="off">
+                    <div class="button-group">
+                        <button id="check-answer" class="btn btn-primary">
+                            ✅ Controleer Antwoord
+                        </button>
+                        <button id="skip-question" class="btn btn-secondary">
+                            ⏭️ Overslaan
+                        </button>
+                    </div>
+                </div>
+                <div id="feedback" class="feedback" style="display: none;">
+                    <div id="feedback-content"></div>
+                    <button id="next-question" class="btn btn-success" style="display: none;">
+                        ➡️ Volgende Vraag
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="error-message" class="error-message" style="display: none;">
+            <div class="error-content">
+                <div class="error-icon">⚠️</div>
+                <h3>Oeps! Er ging iets mis</h3>
+                <p>Sorry, we konden deze toets niet laden. Probeer het opnieuw.</p>
+                <a href="/" class="btn btn-primary">
+                    🏠 Terug naar Toetsen
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTest = null;
+        let currentQuestions = [];
+        let currentQuestionIndex = 0;
+        let userAnswers = [];
+        let testStartTime = null;
+
+        // Get test ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const testId = urlParams.get('id');
+
+        // Load test data
+        async function loadTest() {
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('test-container');
+            const errorMessage = document.getElementById('error-message');
+            
+            loading.style.display = 'block';
+            container.style.display = 'none';
+            errorMessage.style.display = 'none';
+            
+            try {
+                // Load test info and questions
+                const [testResponse, questionsResponse] = await Promise.all([
+                    fetch(`/api/tests/${testId}`),
+                    fetch(`/api/tests/${testId}/questions`)
+                ]);
+                
+                if (!testResponse.ok || !questionsResponse.ok) {
+                    throw new Error('Failed to load test');
+                }
+                
+                currentTest = await testResponse.json();
+                currentQuestions = await questionsResponse.json();
+                
+                if (currentQuestions.length === 0) {
+                    throw new Error('Geen vragen gevonden voor deze toets');
+                }
+                
+                // Initialize test
+                testStartTime = new Date();
+                userAnswers = new Array(currentQuestions.length).fill(null);
+                
+                // Update UI
+                document.getElementById('test-title').textContent = currentTest.title;
+                updateProgress();
+                showCurrentQuestion();
+                
+                loading.style.display = 'none';
+                container.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading test:', error);
+                loading.style.display = 'none';
+                errorMessage.style.display = 'block';
+            }
+        }
+
+        // Show current question
+        function showCurrentQuestion() {
+            const question = currentQuestions[currentQuestionIndex];
+            document.getElementById('question-text').textContent = question.question;
+            document.getElementById('answer-input').value = '';
+            document.getElementById('feedback').style.display = 'none';
+            document.getElementById('answer-input').focus();
+            updateProgress();
+        }
+
+        // Update progress bar
+        function updateProgress() {
+            const progress = ((currentQuestionIndex + 1) / currentQuestions.length) * 100;
+            document.getElementById('progress-fill').style.width = progress + '%';
+            document.getElementById('progress-text').textContent = 
+                `Vraag ${currentQuestionIndex + 1} van ${currentQuestions.length}`;
+        }
+
+        // Check answer
+        function checkAnswer() {
+            const userAnswer = document.getElementById('answer-input').value.trim().toLowerCase();
+            const correctAnswer = currentQuestions[currentQuestionIndex].correct_answer.toLowerCase();
+            const explanation = currentQuestions[currentQuestionIndex].explanation;
+            
+            const isCorrect = userAnswer === correctAnswer;
+            userAnswers[currentQuestionIndex] = {
+                question: currentQuestions[currentQuestionIndex].question,
+                userAnswer: document.getElementById('answer-input').value.trim(),
+                correctAnswer: currentQuestions[currentQuestionIndex].correct_answer,
+                isCorrect: isCorrect,
+                explanation: explanation
+            };
+            
+            // Show feedback
+            const feedback = document.getElementById('feedback');
+            const feedbackContent = document.getElementById('feedback-content');
+            
+            if (isCorrect) {
+                feedback.className = 'feedback feedback-correct';
+                feedbackContent.innerHTML = `
+                    <div class="feedback-icon">🎉</div>
+                    <h3>✅ Uitstekend! Je hebt het goed!</h3>
+                    <div class="feedback-content">
+                        <p>Goed gedaan! Je antwoord is correct.</p>
+                        ${explanation ? `<p><strong>💡 Uitleg:</strong> ${escapeHtml(explanation)}</p>` : ''}
+                    </div>
+                `;
+            } else {
+                feedback.className = 'feedback feedback-incorrect';
+                feedbackContent.innerHTML = `
+                    <div class="feedback-icon">🤔</div>
+                    <h3>❌ Niet helemaal goed, maar blijf proberen!</h3>
+                    <div class="feedback-content">
+                        <p><strong>📝 Jouw antwoord:</strong> ${escapeHtml(document.getElementById('answer-input').value.trim()) || 'Geen antwoord gegeven'}</p>
+                        <p><strong>✅ Correct antwoord:</strong> ${escapeHtml(currentQuestions[currentQuestionIndex].correct_answer)}</p>
+                        ${explanation ? `<p><strong>💡 Uitleg:</strong> ${escapeHtml(explanation)}</p>` : ''}
+                    </div>
+                `;
+            }
+            
+            feedback.style.display = 'block';
+            document.getElementById('next-question').style.display = 'inline-block';
+            document.getElementById('check-answer').style.display = 'none';
+        }
+
+        // Skip question
+        function skipQuestion() {
+            userAnswers[currentQuestionIndex] = {
+                question: currentQuestions[currentQuestionIndex].question,
+                userAnswer: '',
+                correctAnswer: currentQuestions[currentQuestionIndex].correct_answer,
+                isCorrect: false,
+                explanation: currentQuestions[currentQuestionIndex].explanation,
+                skipped: true
+            };
+            
+            nextQuestion();
+        }
+
+        // Next question
+        function nextQuestion() {
+            currentQuestionIndex++;
+            
+            if (currentQuestionIndex >= currentQuestions.length) {
+                // Test completed
+                finishTest();
+            } else {
+                showCurrentQuestion();
+                document.getElementById('check-answer').style.display = 'inline-block';
+            }
+        }
+
+        // Finish test
+        function finishTest() {
+            const testEndTime = new Date();
+            const timeSpent = Math.round((testEndTime - testStartTime) / 1000);
+            
+            // Calculate score
+            const correctAnswers = userAnswers.filter(answer => answer.isCorrect).length;
+            const score = Math.round((correctAnswers / currentQuestions.length) * 100);
+            
+            // Store results in sessionStorage
+            const results = {
+                test: currentTest,
+                answers: userAnswers,
+                score: score,
+                correctAnswers: correctAnswers,
+                totalQuestions: currentQuestions.length,
+                timeSpent: timeSpent
+            };
+            
+            sessionStorage.setItem('testResults', JSON.stringify(results));
+            
+            // Redirect to results page
+            window.location.href = 'results';
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listeners
+        document.getElementById('check-answer').addEventListener('click', checkAnswer);
+        document.getElementById('skip-question').addEventListener('click', skipQuestion);
+        document.getElementById('next-question').addEventListener('click', nextQuestion);
+        
+        // Allow Enter key to check answer
+        document.getElementById('answer-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        // Load test when page loads
+        if (testId) {
+            document.addEventListener('DOMContentLoaded', loadTest);
+        } else {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>
+

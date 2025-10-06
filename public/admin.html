@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beheerpaneel - Overhoren</title>
+    <link rel="stylesheet" href="public/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔧 Beheerpaneel</h1>
+            <p>Beheer je toetsen en vragen met gemak</p>
+        </header>
+        
+        <!-- Dashboard Overview -->
+        <div class="admin-dashboard">
+            <div class="admin-sidebar">
+                <h3>📊 Snelle Statistieken</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-tests">-</div>
+                        <div class="stat-label">Totaal Toetsen</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-questions">-</div>
+                        <div class="stat-label">Totaal Vragen</div>
+                    </div>
+                </div>
+                
+                <div class="quick-actions">
+                    <button class="btn btn-primary btn-icon" onclick="showAddTestModal()">
+                        ➕ Toets Toevoegen
+                    </button>
+                    <button class="btn btn-secondary btn-icon" onclick="refreshData()">
+                        🔄 Verversen
+                    </button>
+                </div>
+            </div>
+            
+            <div class="admin-main">
+                <div class="filter-tabs">
+                    <button class="filter-tab active" onclick="filterTests('all')">Alle Toetsen</button>
+                    <button class="filter-tab" onclick="filterTests('recent')">Recent</button>
+                    <button class="filter-tab" onclick="filterTests('popular')">Meeste Vragen</button>
+        </div>
+        
+                <input type="text" class="search-box" id="search-tests" placeholder="🔍 Zoek toetsen..." onkeyup="searchTests()">
+                
+                <div id="tests-container">
+            <div id="tests-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Toetsen laden...</p>
+            </div>
+                    <div id="tests-list" style="display: none;">
+                <!-- Tests will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Add/Edit Test Modal -->
+        <div id="test-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title" id="modal-title">Nieuwe Toets Toevoegen</h2>
+                    <span class="close" onclick="closeModal()">&times;</span>
+                </div>
+                <form id="test-form">
+                <div class="form-group">
+                    <label for="test-title">Toets Titel:</label>
+                    <input type="text" id="test-title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="test-description">Beschrijving:</label>
+                    <textarea id="test-description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">Toets Opslaan</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuleren</button>
+                    </div>
+                </form>
+            </div>
+                </div>
+                
+        <!-- Questions Modal -->
+        <div id="questions-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title" id="questions-modal-title">Vragen Beheren</h2>
+                    <span class="close" onclick="closeQuestionsModal()">&times;</span>
+                </div>
+                <div class="quick-actions">
+                    <button class="btn btn-primary btn-icon" onclick="addQuestion()">
+                        ➕ Vraag Toevoegen
+                    </button>
+                </div>
+                <div id="questions-list" class="questions-list">
+                    <!-- Questions will be loaded here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Success/Error messages -->
+        <div id="message" class="message" style="display: none;"></div>
+        
+        <footer>
+            <a href="/" class="btn btn-secondary">
+                🏠 Terug naar Hoofdpagina
+            </a>
+        </footer>
+    </div>
+
+    <script>
+        let currentTestId = null;
+        let currentEditingTest = null;
+        let allTests = [];
+        let currentFilter = 'all';
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTests();
+        });
+
+        // Load all tests
+        async function loadTests() {
+            const loading = document.getElementById('tests-loading');
+            const list = document.getElementById('tests-list');
+            
+            loading.style.display = 'block';
+            list.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/tests');
+                allTests = await response.json();
+                
+                updateStats();
+                displayTests(allTests);
+                
+                loading.style.display = 'none';
+                list.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading tests:', error);
+                showMessage('Fout bij laden van toetsen', 'error');
+                loading.style.display = 'none';
+            }
+        }
+
+        // Update statistics
+        async function updateStats() {
+            const totalTests = allTests.length;
+            let totalQuestions = 0;
+            
+            for (const test of allTests) {
+                try {
+                    const response = await fetch(`/api/tests/${test.id}/questions`);
+                    const questions = await response.json();
+                    totalQuestions += questions.length;
+                } catch (error) {
+                    console.error('Error loading questions for test:', test.id);
+                }
+            }
+            
+            document.getElementById('total-tests').textContent = totalTests;
+            document.getElementById('total-questions').textContent = totalQuestions;
+        }
+
+        // Display tests
+        function displayTests(tests) {
+            const container = document.getElementById('tests-list');
+            
+            if (tests.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📝</div>
+                        <h3>Geen toetsen gevonden</h3>
+                        <p>Maak je eerste toets om te beginnen!</p>
+                        <button class="btn btn-primary" onclick="showAddTestModal()">Toets Maken</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = tests.map(test => `
+                <div class="test-card-enhanced" data-test-id="${test.id}">
+                    <div class="test-header">
+                        <h3 class="test-title">${escapeHtml(test.title)}</h3>
+                        <div class="test-meta">
+                            <div class="test-meta-item">
+                                <span>📅</span>
+                                <span>${new Date(test.created_at).toLocaleDateString()}</span>
+                            </div>
+                            <div class="test-meta-item" id="question-count-${test.id}">
+                                <span>❓</span>
+                                <span>Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="test-description">
+                        ${escapeHtml(test.description || 'No description provided')}
+                    </div>
+                    <div class="test-actions">
+                        <button class="btn btn-primary btn-sm btn-icon" onclick="editTest(${test.id})">
+                            ✏️ Bewerken
+                        </button>
+                        <button class="btn btn-secondary btn-sm btn-icon" onclick="manageQuestions(${test.id})">
+                            ❓ Vragen
+                        </button>
+                        <button class="btn btn-success btn-sm btn-icon" onclick="duplicateTest(${test.id})">
+                            📋 Dupliceren
+                        </button>
+                        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteTest(${test.id})">
+                            🗑️ Verwijderen
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Load question counts for each test
+            tests.forEach(test => {
+                loadQuestionCount(test.id);
+            });
+        }
+
+        // Load question count for a test
+        async function loadQuestionCount(testId) {
+            try {
+                const response = await fetch(`/api/tests/${testId}/questions`);
+                const questions = await response.json();
+                const countElement = document.getElementById(`question-count-${testId}`);
+                if (countElement) {
+                    countElement.innerHTML = `<span>❓</span><span>${questions.length} vragen</span>`;
+                }
+            } catch (error) {
+                console.error('Error loading question count:', error);
+            }
+        }
+
+        // Filter tests
+        function filterTests(filter) {
+            currentFilter = filter;
+            
+            // Update filter tabs
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            let filteredTests = [...allTests];
+            
+            switch (filter) {
+                case 'recent':
+                    filteredTests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    filteredTests = filteredTests.slice(0, 5);
+                    break;
+                case 'popular':
+                    // Sort by question count (we'll need to load this data)
+                    filteredTests.sort((a, b) => b.questionCount - a.questionCount);
+                    break;
+                default:
+                    filteredTests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            }
+            
+            displayTests(filteredTests);
+        }
+
+        // Search tests
+        function searchTests() {
+            const searchTerm = document.getElementById('search-tests').value.toLowerCase();
+            const filteredTests = allTests.filter(test => 
+                test.title.toLowerCase().includes(searchTerm) ||
+                (test.description && test.description.toLowerCase().includes(searchTerm))
+            );
+            displayTests(filteredTests);
+        }
+
+        // Show add test modal
+        function showAddTestModal() {
+            currentEditingTest = null;
+            document.getElementById('modal-title').textContent = 'Nieuwe Toets Toevoegen';
+            document.getElementById('test-form').reset();
+            document.getElementById('test-modal').style.display = 'block';
+        }
+
+        // Edit test
+        async function editTest(testId) {
+            const test = allTests.find(t => t.id == testId);
+            if (!test) return;
+            
+            currentEditingTest = test;
+            document.getElementById('modal-title').textContent = 'Toets Bewerken';
+            document.getElementById('test-title').value = test.title;
+            document.getElementById('test-description').value = test.description || '';
+            document.getElementById('test-modal').style.display = 'block';
+        }
+
+        // Save test (add or edit)
+        document.getElementById('test-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const testData = {
+                title: formData.get('title'),
+                description: formData.get('description')
+            };
+            
+            try {
+                let response;
+                if (currentEditingTest) {
+                    // Update existing test
+                    response = await fetch(`/api/tests/${currentEditingTest.id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(testData)
+                    });
+                } else {
+                    // Create new test
+                    response = await fetch('/api/tests', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                }
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save test');
+                }
+                
+                showMessage(currentEditingTest ? 'Toets succesvol bijgewerkt!' : 'Toets succesvol aangemaakt!', 'success');
+                closeModal();
+                loadTests();
+                
+            } catch (error) {
+                console.error('Error saving test:', error);
+                showMessage('Fout bij opslaan van toets', 'error');
+            }
+        });
+
+        // Manage questions
+        async function manageQuestions(testId) {
+            currentTestId = testId;
+            const test = allTests.find(t => t.id == testId);
+            document.getElementById('questions-modal-title').textContent = `Manage Questions - ${test.title}`;
+            document.getElementById('questions-modal').style.display = 'block';
+            await loadQuestions(testId);
+        }
+
+        // Load questions for a test
+        async function loadQuestions(testId) {
+            const container = document.getElementById('questions-list');
+            
+            try {
+                const response = await fetch(`/api/tests/${testId}/questions`);
+                const questions = await response.json();
+                
+                if (questions.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">❓</div>
+                            <h3>Nog geen vragen</h3>
+                            <p>Voeg je eerste vraag toe om te beginnen!</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = questions.map((question, index) => `
+                    <div class="question-item" data-question-id="${question.id}">
+                        <div class="question-header">
+                            <span class="question-number">Vraag ${index + 1}</span>
+                            <div class="question-actions">
+                                <button class="btn btn-primary btn-sm" onclick="editQuestion(${question.id})">Bewerken</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteQuestion(${question.id})">Verwijderen</button>
+                            </div>
+                        </div>
+                        <div class="question-content">
+                            <div class="question-text">${escapeHtml(question.question)}</div>
+                            <div class="answer-text">Antwoord: ${escapeHtml(question.correct_answer)}</div>
+                            ${question.explanation ? `<div class="explanation-text">Uitleg: ${escapeHtml(question.explanation)}</div>` : ''}
+                        </div>
+                        <div class="edit-form" id="edit-form-${question.id}">
+                            <div class="form-row full">
+                <div class="form-group">
+                    <label>Vraag:</label>
+                                    <textarea name="question" required>${escapeHtml(question.question)}</textarea>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Correct Antwoord:</label>
+                                    <input type="text" name="answer" required value="${escapeHtml(question.correct_answer)}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Uitleg:</label>
+                                    <textarea name="explanation" rows="2">${escapeHtml(question.explanation || '')}</textarea>
+                                </div>
+                </div>
+                            <div class="form-group">
+                                <button class="btn btn-success btn-sm" onclick="saveQuestion(${question.id})">Opslaan</button>
+                                <button class="btn btn-secondary btn-sm" onclick="cancelEdit(${question.id})">Annuleren</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error loading questions:', error);
+                showMessage('Fout bij laden van vragen', 'error');
+            }
+        }
+
+        // Add new question
+        function addQuestion() {
+            const container = document.getElementById('questions-list');
+            const questionId = 'new-' + Date.now();
+            
+            const questionHtml = `
+                <div class="question-item" data-question-id="${questionId}">
+                    <div class="question-header">
+                        <span class="question-number">Nieuwe Vraag</span>
+                        <div class="question-actions">
+                            <button class="btn btn-success btn-sm" onclick="saveNewQuestion('${questionId}')">Opslaan</button>
+                            <button class="btn btn-secondary btn-sm" onclick="cancelNewQuestion('${questionId}')">Annuleren</button>
+                        </div>
+                    </div>
+                    <div class="edit-form" style="display: block;">
+                        <div class="form-row full">
+                            <div class="form-group">
+                                <label>Vraag:</label>
+                                <textarea name="question" required placeholder="Voer je vraag hier in..."></textarea>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                <div class="form-group">
+                    <label>Correct Answer:</label>
+                                <input type="text" name="answer" required placeholder="Voer het juiste antwoord in...">
+                </div>
+                <div class="form-group">
+                                <label>Explanation:</label>
+                                <textarea name="explanation" rows="2" placeholder="Optionele uitleg..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('afterbegin', questionHtml);
+        }
+
+        // Save new question
+        async function saveNewQuestion(questionId) {
+            const questionItem = document.querySelector(`[data-question-id="${questionId}"]`);
+            const form = questionItem.querySelector('.edit-form');
+            
+            const questionData = {
+                test_id: currentTestId,
+                question: form.querySelector('textarea[name="question"]').value.trim(),
+                correct_answer: form.querySelector('input[name="answer"]').value.trim(),
+                explanation: form.querySelector('textarea[name="explanation"]').value.trim(),
+                question_order: document.querySelectorAll('.question-item').length
+            };
+            
+            if (!questionData.question || !questionData.correct_answer) {
+                showMessage('Vul alle verplichte velden in', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/questions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(questionData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save question');
+                }
+                
+                showMessage('Vraag succesvol toegevoegd!', 'success');
+                loadQuestions(currentTestId);
+                
+            } catch (error) {
+                console.error('Error saving question:', error);
+                showMessage('Fout bij opslaan van vraag', 'error');
+            }
+        }
+
+        // Cancel new question
+        function cancelNewQuestion(questionId) {
+            document.querySelector(`[data-question-id="${questionId}"]`).remove();
+        }
+
+        // Edit question
+        function editQuestion(questionId) {
+            const editForm = document.getElementById(`edit-form-${questionId}`);
+            editForm.style.display = editForm.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Save question edit
+        async function saveQuestion(questionId) {
+            const questionItem = document.querySelector(`[data-question-id="${questionId}"]`);
+            const form = questionItem.querySelector('.edit-form');
+            
+            const questionData = {
+                question: form.querySelector('textarea[name="question"]').value.trim(),
+                correct_answer: form.querySelector('input[name="answer"]').value.trim(),
+                explanation: form.querySelector('textarea[name="explanation"]').value.trim(),
+                question_order: 1 // We'll keep the same order for now
+            };
+            
+            if (!questionData.question || !questionData.correct_answer) {
+                showMessage('Vul alle verplichte velden in', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/questions/${questionId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(questionData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to update question');
+                }
+                
+                showMessage('Vraag succesvol bijgewerkt!', 'success');
+                loadQuestions(currentTestId);
+                
+            } catch (error) {
+                console.error('Error updating question:', error);
+                showMessage('Fout bij bijwerken van vraag', 'error');
+            }
+        }
+
+        // Cancel edit
+        function cancelEdit(questionId) {
+            document.getElementById(`edit-form-${questionId}`).style.display = 'none';
+        }
+
+        // Delete question
+        async function deleteQuestion(questionId) {
+            if (!confirm('Weet je zeker dat je deze vraag wilt verwijderen?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/questions/${questionId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to delete question');
+                }
+                
+                showMessage('Vraag succesvol verwijderd', 'success');
+                loadQuestions(currentTestId);
+                
+            } catch (error) {
+                console.error('Error deleting question:', error);
+                showMessage('Fout bij verwijderen van vraag', 'error');
+            }
+        }
+
+        // Duplicate test
+        async function duplicateTest(testId) {
+            const test = allTests.find(t => t.id == testId);
+            if (!test) return;
+            
+            if (!confirm(`"${test.title}" dupliceren?`)) {
+                return;
+            }
+            
+            try {
+                // Create new test
+                const testData = {
+                    title: test.title + ' (Copy)',
+                    description: test.description
+                };
+                
+                const response = await fetch('/api/tests', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to duplicate test');
+                }
+                
+                const newTest = await response.json();
+                
+                // Copy questions
+                const questionsResponse = await fetch(`/api/tests/${testId}/questions`);
+                const questions = await questionsResponse.json();
+                
+                for (const question of questions) {
+                    const questionData = {
+                        test_id: newTest.id,
+                        question: question.question,
+                        correct_answer: question.correct_answer,
+                        explanation: question.explanation,
+                        question_order: question.question_order
+                    };
+                    
+                    await fetch('/api/questions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(questionData)
+                    });
+                }
+                
+                showMessage('Toets succesvol gedupliceerd!', 'success');
+                loadTests();
+                
+            } catch (error) {
+                console.error('Error duplicating test:', error);
+                showMessage('Fout bij dupliceren van toets', 'error');
+            }
+        }
+
+        // Delete test
+        async function deleteTest(testId) {
+            const test = allTests.find(t => t.id == testId);
+            if (!test) return;
+            
+            if (!confirm(`Weet je zeker dat je "${test.title}" wilt verwijderen? Dit zal ook alle vragen verwijderen.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/tests/${testId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to delete test');
+                }
+                
+                showMessage('Toets succesvol verwijderd', 'success');
+                loadTests();
+                
+            } catch (error) {
+                console.error('Error deleting test:', error);
+                showMessage('Fout bij verwijderen van toets', 'error');
+            }
+        }
+
+        // Close modals
+        function closeModal() {
+            document.getElementById('test-modal').style.display = 'none';
+            currentEditingTest = null;
+        }
+
+        function closeQuestionsModal() {
+            document.getElementById('questions-modal').style.display = 'none';
+            currentTestId = null;
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const testModal = document.getElementById('test-modal');
+            const questionsModal = document.getElementById('questions-modal');
+            
+            if (event.target === testModal) {
+                closeModal();
+            }
+            if (event.target === questionsModal) {
+                closeQuestionsModal();
+            }
+        }
+
+        // Refresh data
+        function refreshData() {
+            loadTests();
+        }
+
+        // Show message
+        function showMessage(text, type) {
+            const message = document.getElementById('message');
+            message.textContent = text;
+            message.className = `message ${type}`;
+            message.style.display = 'block';
+            
+            setTimeout(() => {
+                message.style.display = 'none';
+            }, 3000);
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

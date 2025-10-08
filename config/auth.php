@@ -35,7 +35,7 @@ function isAuthenticated() {
  */
 function authenticate($username, $password) {
     require_once __DIR__ . '/database.php';
-    global $pdo;
+    $pdo = $GLOBALS['pdo'];
     
     try {
         $stmt = $pdo->prepare("SELECT id, username, password_hash, full_name, is_active FROM admin_users WHERE username = ? AND is_active = 1");
@@ -201,7 +201,7 @@ function verifyPassword($password, $hash) {
  */
 function createAdminUser($username, $password, $email = null, $fullName = null) {
     require_once __DIR__ . '/database.php';
-    global $pdo;
+    $pdo = $GLOBALS['pdo'];
     
     try {
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
@@ -219,7 +219,7 @@ function createAdminUser($username, $password, $email = null, $fullName = null) 
  */
 function updateAdminUserPassword($userId, $newPassword) {
     require_once __DIR__ . '/database.php';
-    global $pdo;
+    $pdo = $GLOBALS['pdo'];
     
     try {
         $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
@@ -237,7 +237,7 @@ function updateAdminUserPassword($userId, $newPassword) {
  */
 function updateAdminUser($userId, $username = null, $email = null, $fullName = null, $isActive = null) {
     require_once __DIR__ . '/database.php';
-    global $pdo;
+    $pdo = $GLOBALS['pdo'];
     
     try {
         $fields = [];
@@ -283,7 +283,7 @@ function updateAdminUser($userId, $username = null, $email = null, $fullName = n
  */
 function getAllAdminUsers() {
     require_once __DIR__ . '/database.php';
-    global $pdo;
+    $pdo = $GLOBALS['pdo'];
     
     try {
         $stmt = $pdo->prepare("SELECT id, username, email, full_name, is_active, last_login, created_at FROM admin_users ORDER BY created_at DESC");
@@ -300,7 +300,7 @@ function getAllAdminUsers() {
  */
 function getAdminUserById($userId) {
     require_once __DIR__ . '/database.php';
-    global $pdo;
+    $pdo = $GLOBALS['pdo'];
     
     try {
         $stmt = $pdo->prepare("SELECT id, username, email, full_name, is_active, last_login, created_at FROM admin_users WHERE id = ?");
@@ -317,7 +317,7 @@ function getAdminUserById($userId) {
  */
 function deleteAdminUser($userId) {
     require_once __DIR__ . '/database.php';
-    global $pdo;
+    $pdo = $GLOBALS['pdo'];
     
     try {
         // Don't allow deleting the last admin user
@@ -343,7 +343,7 @@ function deleteAdminUser($userId) {
  */
 function usernameExists($username, $excludeUserId = null) {
     require_once __DIR__ . '/database.php';
-    global $pdo;
+    $pdo = $GLOBALS['pdo'];
     
     try {
         $sql = "SELECT COUNT(*) FROM admin_users WHERE username = ?";
@@ -368,7 +368,7 @@ function usernameExists($username, $excludeUserId = null) {
  */
 function hasAdminUsers() {
     require_once __DIR__ . '/database.php';
-    global $pdo;
+    $pdo = $GLOBALS['pdo'];
     
     try {
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM admin_users");

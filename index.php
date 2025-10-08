@@ -1,33 +1,5 @@
 <?php
-// Check if application is installed
-function isApplicationInstalled() {
-    // Check if database config exists
-    if (!file_exists('config/database.php')) {
-        return false;
-    }
-    
-    // Check if auth config exists
-    if (!file_exists('config/auth.php')) {
-        return false;
-    }
-    
-    // Try to include database config and test connection
-    try {
-        require_once 'config/database.php';
-        // Test if we can query the database
-        $stmt = $pdo->query("SELECT COUNT(*) FROM tests");
-        return true;
-    } catch (Exception $e) {
-        return false;
-    }
-}
-
-// If not installed, redirect to install page
-if (!isApplicationInstalled()) {
-    header('Location: /install.php');
-    exit;
-}
-
+require_once 'config/database.php';
 require_once 'config/auth.php';
 
 // Get the request method and URI
@@ -189,14 +161,14 @@ try {
         
         // GET /api/tests - Get all tests
         if ($apiPath === 'tests' && $method === 'GET') {
-            $stmt = executeQuery($pdo, 'SELECT * FROM tests ORDER BY created_at DESC');
+            $stmt = executeQuery($GLOBALS['pdo'], 'SELECT * FROM tests ORDER BY created_at DESC');
             $tests = $stmt->fetchAll();
             sendJsonResponse($tests);
         }
         
         // GET /api/tests/stats - Get test statistics
         if ($apiPath === 'tests/stats' && $method === 'GET') {
-            $stmt = executeQuery($pdo, '
+            $stmt = executeQuery($GLOBALS['pdo'], '
                 SELECT 
                     t.id,
                     t.title,
@@ -215,7 +187,7 @@ try {
         // GET /api/tests/:id - Get single test
         if (preg_match('/^tests\/(\d+)$/', $apiPath, $matches) && $method === 'GET') {
             $testId = $matches[1];
-            $stmt = executeQuery($pdo, 'SELECT * FROM tests WHERE id = ?', [$testId]);
+            $stmt = executeQuery($GLOBALS['pdo'], 'SELECT * FROM tests WHERE id = ?', [$testId]);
             $test = $stmt->fetch();
             
             if (!$test) {
@@ -228,7 +200,7 @@ try {
         // GET /api/tests/:id/questions - Get questions for a test
         if (preg_match('/^tests\/(\d+)\/questions$/', $apiPath, $matches) && $method === 'GET') {
             $testId = $matches[1];
-            $stmt = executeQuery($pdo, 
+            $stmt = executeQuery($GLOBALS['pdo'], 
                 'SELECT * FROM questions WHERE test_id = ? ORDER BY question_order', 
                 [$testId]
             );
@@ -243,12 +215,12 @@ try {
             $title = $input['title'] ?? '';
             $description = $input['description'] ?? '';
             
-            $stmt = executeQuery($pdo, 
+            $stmt = executeQuery($GLOBALS['pdo'], 
                 'INSERT INTO tests (title, description) VALUES (?, ?)', 
                 [$title, $description]
             );
             
-            $testId = $pdo->lastInsertId();
+            $testId = $GLOBALS['pdo']->lastInsertId();
             sendJsonResponse(['id' => $testId, 'message' => 'Test created successfully']);
         }
         
@@ -262,12 +234,12 @@ try {
             $explanation = $input['explanation'] ?? '';
             $questionOrder = max(1, intval($input['question_order'] ?? 1));
             
-            $stmt = executeQuery($pdo, 
+            $stmt = executeQuery($GLOBALS['pdo'], 
                 'INSERT INTO questions (test_id, question, correct_answer, explanation, question_order) VALUES (?, ?, ?, ?, ?)', 
                 [$testId, $question, $correctAnswer, $explanation, $questionOrder]
             );
             
-            $questionId = $pdo->lastInsertId();
+            $questionId = $GLOBALS['pdo']->lastInsertId();
             sendJsonResponse(['id' => $questionId, 'message' => 'Question added successfully']);
         }
         
@@ -279,7 +251,7 @@ try {
             $title = $input['title'] ?? '';
             $description = $input['description'] ?? '';
             
-            $stmt = executeQuery($pdo, 
+            $stmt = executeQuery($GLOBALS['pdo'], 
                 'UPDATE tests SET title = ?, description = ? WHERE id = ?', 
                 [$title, $description, $testId]
             );
@@ -291,7 +263,7 @@ try {
         if (preg_match('/^tests\/(\d+)$/', $apiPath, $matches) && $method === 'DELETE') {
             requireAdminAuth();
             $testId = $matches[1];
-            executeQuery($pdo, 'DELETE FROM tests WHERE id = ?', [$testId]);
+            executeQuery($GLOBALS['pdo'], 'DELETE FROM tests WHERE id = ?', [$testId]);
             sendJsonResponse(['message' => 'Test deleted successfully']);
         }
         
@@ -305,7 +277,7 @@ try {
             $explanation = $input['explanation'] ?? '';
             $questionOrder = max(1, intval($input['question_order'] ?? 1));
             
-            $stmt = executeQuery($pdo, 
+            $stmt = executeQuery($GLOBALS['pdo'], 
                 'UPDATE questions SET question = ?, correct_answer = ?, explanation = ?, question_order = ? WHERE id = ?', 
                 [$question, $correctAnswer, $explanation, $questionOrder, $questionId]
             );
@@ -317,7 +289,7 @@ try {
         if (preg_match('/^questions\/(\d+)$/', $apiPath, $matches) && $method === 'DELETE') {
             requireAdminAuth();
             $questionId = $matches[1];
-            executeQuery($pdo, 'DELETE FROM questions WHERE id = ?', [$questionId]);
+            executeQuery($GLOBALS['pdo'], 'DELETE FROM questions WHERE id = ?', [$questionId]);
             sendJsonResponse(['message' => 'Question deleted successfully']);
         }
         

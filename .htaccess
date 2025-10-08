@@ -1,8 +1,10 @@
 RewriteEngine On
 
 # Handle clean URLs - redirect all requests to index.php
+# BUT exclude install.php to prevent redirect loops
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/install
 RewriteRule ^(.*)$ index.php [QSA,L]
 
 # Security headers

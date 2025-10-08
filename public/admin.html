@@ -470,7 +470,7 @@
                         </div>
                         <div class="question-content">
                             <div class="question-text">${escapeHtml(question.question)}</div>
-                            <div class="answer-text">Antwoord: ${escapeHtml(question.correct_answer)}</div>
+                            <div class="answer-text">Antwoorden: ${formatAnswersForDisplay(question.correct_answer)}</div>
                             ${question.explanation ? `<div class="explanation-text">Uitleg: ${escapeHtml(question.explanation)}</div>` : ''}
                         </div>
                         <div class="edit-form" id="edit-form-${question.id}">
@@ -482,8 +482,9 @@
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>Correct Antwoord:</label>
-                                    <input type="text" name="answer" required value="${escapeHtml(question.correct_answer)}">
+                                    <label>Correcte Antwoorden:</label>
+                                    <textarea name="answer" required rows="3">${escapeHtml(formatAnswersForEdit(question.correct_answer))}</textarea>
+                                    <small>Elke regel is een acceptabel antwoord</small>
                                 </div>
                                 <div class="form-group">
                                     <label>Uitleg:</label>
@@ -527,8 +528,9 @@
                         </div>
                         <div class="form-row">
                 <div class="form-group">
-                    <label>Correct Answer:</label>
-                                <input type="text" name="answer" required placeholder="Voer het juiste antwoord in...">
+                    <label>Correcte Antwoorden:</label>
+                                <textarea name="answer" required placeholder="Voer de juiste antwoorden in (één per regel)..." rows="3"></textarea>
+                                <small>Elke regel is een acceptabel antwoord. Bijvoorbeeld:<br>Amsterdam<br>amsterdam<br>AMSTERDAM</small>
                 </div>
                 <div class="form-group">
                                 <label>Explanation:</label>
@@ -547,10 +549,13 @@
             const questionItem = document.querySelector(`[data-question-id="${questionId}"]`);
             const form = questionItem.querySelector('.edit-form');
             
+            const answerText = form.querySelector('textarea[name="answer"]').value.trim();
+            const correctAnswers = answerText.split('\n').map(answer => answer.trim()).filter(answer => answer.length > 0);
+            
             const questionData = {
                 test_id: currentTestId,
                 question: form.querySelector('textarea[name="question"]').value.trim(),
-                correct_answer: form.querySelector('input[name="answer"]').value.trim(),
+                correct_answer: JSON.stringify(correctAnswers),
                 explanation: form.querySelector('textarea[name="explanation"]').value.trim(),
                 question_order: document.querySelectorAll('.question-item').length
             };
@@ -598,9 +603,12 @@
             const questionItem = document.querySelector(`[data-question-id="${questionId}"]`);
             const form = questionItem.querySelector('.edit-form');
             
+            const answerText = form.querySelector('textarea[name="answer"]').value.trim();
+            const correctAnswers = answerText.split('\n').map(answer => answer.trim()).filter(answer => answer.length > 0);
+            
             const questionData = {
                 question: form.querySelector('textarea[name="question"]').value.trim(),
-                correct_answer: form.querySelector('input[name="answer"]').value.trim(),
+                correct_answer: JSON.stringify(correctAnswers),
                 explanation: form.querySelector('textarea[name="explanation"]').value.trim(),
                 question_order: 1 // We'll keep the same order for now
             };
@@ -795,6 +803,36 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Helper function to format answers for display
+        function formatAnswersForDisplay(answerData) {
+            try {
+                // Try to parse as JSON array first
+                const answers = JSON.parse(answerData);
+                if (Array.isArray(answers)) {
+                    return answers.map(answer => escapeHtml(answer)).join(', ');
+                }
+            } catch (e) {
+                // If not JSON, treat as single answer (backward compatibility)
+                return escapeHtml(answerData);
+            }
+            return escapeHtml(answerData);
+        }
+
+        // Helper function to format answers for editing
+        function formatAnswersForEdit(answerData) {
+            try {
+                // Try to parse as JSON array first
+                const answers = JSON.parse(answerData);
+                if (Array.isArray(answers)) {
+                    return answers.join('\n');
+                }
+            } catch (e) {
+                // If not JSON, treat as single answer (backward compatibility)
+                return answerData;
+            }
+            return answerData;
         }
 
         // Add logout button event listener

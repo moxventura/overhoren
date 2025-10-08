@@ -138,10 +138,24 @@
         // Check answer
         function checkAnswer() {
             const userAnswer = document.getElementById('answer-input').value.trim().toLowerCase();
-            const correctAnswer = currentQuestions[currentQuestionIndex].correct_answer.toLowerCase();
+            const correctAnswerData = currentQuestions[currentQuestionIndex].correct_answer;
             const explanation = currentQuestions[currentQuestionIndex].explanation;
             
-            const isCorrect = userAnswer === correctAnswer;
+            // Parse correct answers (handle both JSON arrays and single strings for backward compatibility)
+            let correctAnswers = [];
+            try {
+                const parsed = JSON.parse(correctAnswerData);
+                if (Array.isArray(parsed)) {
+                    correctAnswers = parsed.map(answer => answer.toLowerCase());
+                } else {
+                    correctAnswers = [correctAnswerData.toLowerCase()];
+                }
+            } catch (e) {
+                // If not JSON, treat as single answer (backward compatibility)
+                correctAnswers = [correctAnswerData.toLowerCase()];
+            }
+            
+            const isCorrect = correctAnswers.includes(userAnswer);
             userAnswers[currentQuestionIndex] = {
                 question: currentQuestions[currentQuestionIndex].question,
                 userAnswer: document.getElementById('answer-input').value.trim(),
@@ -171,7 +185,7 @@
                     <h3>❌ Niet helemaal goed, maar blijf proberen!</h3>
                     <div class="feedback-content">
                         <p><strong>📝 Jouw antwoord:</strong> ${escapeHtml(document.getElementById('answer-input').value.trim()) || 'Geen antwoord gegeven'}</p>
-                        <p><strong>✅ Correct antwoord:</strong> ${escapeHtml(currentQuestions[currentQuestionIndex].correct_answer)}</p>
+                        <p><strong>✅ Correcte antwoorden:</strong> ${formatCorrectAnswersForDisplay(correctAnswerData)}</p>
                         ${explanation ? `<p><strong>💡 Uitleg:</strong> ${escapeHtml(explanation)}</p>` : ''}
                     </div>
                 `;
@@ -239,6 +253,21 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Helper function to format correct answers for display
+        function formatCorrectAnswersForDisplay(answerData) {
+            try {
+                // Try to parse as JSON array first
+                const answers = JSON.parse(answerData);
+                if (Array.isArray(answers)) {
+                    return answers.map(answer => escapeHtml(answer)).join(', ');
+                }
+            } catch (e) {
+                // If not JSON, treat as single answer (backward compatibility)
+                return escapeHtml(answerData);
+            }
+            return escapeHtml(answerData);
         }
 
         // Event listeners

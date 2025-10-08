@@ -24,7 +24,7 @@ function isApplicationInstalled() {
 
 // If not installed, redirect to install page
 if (!isApplicationInstalled()) {
-    header('Location: /install');
+    header('Location: /install.php');
     exit;
 }
 

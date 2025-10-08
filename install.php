@@ -89,14 +89,34 @@ function executeQuery(\$pdo, \$sql, \$params = []) {
         try {
             require_once 'config/database.php';
             
-            // Install schema
+            // Install schema - read and clean the schema file
             $schema = file_get_contents('database/schema.sql');
-            $pdo->exec($schema);
+            
+            // Remove CREATE DATABASE and USE statements since we're already connected to the database
+            $schema = preg_replace('/CREATE DATABASE IF NOT EXISTS [^;]+;/i', '', $schema);
+            $schema = preg_replace('/USE [^;]+;/i', '', $schema);
+            
+            // Split into individual statements and execute them
+            $statements = array_filter(array_map('trim', explode(';', $schema)));
+            foreach ($statements as $statement) {
+                if (!empty($statement)) {
+                    $pdo->exec($statement);
+                }
+            }
             
             // Install sample data if requested
             if (isset($_POST['install_sample_data'])) {
                 $data = file_get_contents('database/data.sql');
-                $pdo->exec($data);
+                // Clean the data file as well
+                $data = preg_replace('/CREATE DATABASE IF NOT EXISTS [^;]+;/i', '', $data);
+                $data = preg_replace('/USE [^;]+;/i', '', $data);
+                
+                $dataStatements = array_filter(array_map('trim', explode(';', $data)));
+                foreach ($dataStatements as $statement) {
+                    if (!empty($statement)) {
+                        $pdo->exec($statement);
+                    }
+                }
             }
             
             $success = 'Database installed successfully!';

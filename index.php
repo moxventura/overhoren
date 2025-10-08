@@ -1,5 +1,33 @@
 <?php
-require_once 'config/database.php';
+// Check if application is installed
+function isApplicationInstalled() {
+    // Check if database config exists
+    if (!file_exists('config/database.php')) {
+        return false;
+    }
+    
+    // Check if auth config exists
+    if (!file_exists('config/auth.php')) {
+        return false;
+    }
+    
+    // Try to include database config and test connection
+    try {
+        require_once 'config/database.php';
+        // Test if we can query the database
+        $stmt = $pdo->query("SELECT COUNT(*) FROM tests");
+        return true;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+// If not installed, redirect to install page
+if (!isApplicationInstalled()) {
+    header('Location: /install');
+    exit;
+}
+
 require_once 'config/auth.php';
 
 // Get the request method and URI
